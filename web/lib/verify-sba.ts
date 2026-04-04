@@ -15,6 +15,7 @@ import type {
   Rail,
   TrustBundle,
 } from "mpcp-service/sdk";
+import { checkGrantCredentialLiveness } from "./xrpl";
 
 export interface SbaVerifyResult {
   ok: boolean;
@@ -203,6 +204,22 @@ export async function verifySbaOffline(
         ok: false,
         reason: `Exceeds offline per-transaction limit: ${txAmount} > ${offlineCap} drops`,
       };
+    }
+  }
+
+  // ── XLS-70 on-chain credential liveness check ────────────────────────────
+  const credIssuer = innerGrant.activeGrantCredentialIssuer as string | undefined;
+  const credSubject = innerGrant.authorizedGateway as string | undefined;
+  const credGrantId = innerGrant.grantId as string | undefined;
+
+  if (credIssuer && credSubject && credGrantId) {
+    try {
+      const live = await checkGrantCredentialLiveness(credIssuer, credSubject, credGrantId);
+      if (!live) {
+        return { ok: false, reason: "Grant credential not found on XRPL — grant revoked or expired" };
+      }
+    } catch {
+      // XRPL connectivity issue — fall through (best-effort)
     }
   }
 

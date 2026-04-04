@@ -177,6 +177,29 @@ export async function queryOnChainSpend(
   return String(totalDrops);
 }
 
+/**
+ * Check if an XLS-70 grant credential exists on-ledger (liveness proof).
+ * Returns true if the credential object is found, false if not (revoked/expired).
+ */
+export async function checkGrantCredentialLiveness(
+  issuer: string,
+  subject: string,
+  grantId: string,
+): Promise<boolean> {
+  const client = await getClient();
+  const credentialType = Buffer.from(`mpcp/grant:${grantId}`).toString("hex").toUpperCase();
+  try {
+    await client.request({
+      command: "ledger_entry",
+      credential: { subject, issuer, credentialType },
+      ledger_index: "validated",
+    } as any);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function fetchTransaction(
   _network: string,
   txHash: string,
