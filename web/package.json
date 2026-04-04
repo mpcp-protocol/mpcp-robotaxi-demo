@@ -1,0 +1,30 @@
+{
+  "name": "mpcp-robotaxi-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3001",
+    "build": "next build",
+    "start": "next start -p 3001"
+  },
+  "dependencies": {
+    "@mpcp/agent": "file:../../mpcp-wallet-sdk/packages/agent",
+    "@tanstack/react-query": "^5.0.0",
+    "mpcp-gateway-client": "file:../../mpcp-gateway-client",
+    "mpcp-service": "file:../../mpcp-reference",
+    "next": "^15.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "x402-xrpl-settlement-adapter": "file:../../x402-xrpl",
+    "xrpl": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "autoprefixer": "^10.4.0",
+    "postcss": "^8.5.0",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.8.0"
+  }
+}

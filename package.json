@@ -1,0 +1,20 @@
+{
+  "name": "mpcp-robotaxi",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "setup": "npx tsx scripts/setup.ts",
+    "dev": "cd web && npm run dev",
+    "web": "cd web && npm run dev"
+  },
+  "devDependencies": {
+    "tsx": "^4.0.0",
+    "typescript": "^5.8.0",
+    "@types/node": "^22.0.0"
+  },
+  "dependencies": {
+    "xrpl": "^4.0.0",
+    "viem": "^2.0.0"
+  }
+}
