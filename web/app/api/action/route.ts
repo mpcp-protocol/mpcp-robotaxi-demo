@@ -7,12 +7,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   getActiveSession,
+  getActiveSessionUnsafe,
   getAllowedPurposes,
   getGrantForVerification,
   hasGrant,
 } from "@/lib/agent-session";
 import { broadcast } from "@/lib/events";
 import { MERCHANTS, type MerchantType } from "@/lib/merchants";
+import { isMalicious } from "@/lib/demo-controls";
 import { getMerchantChallenge } from "@/lib/merchant-handlers";
 import {
   getMerchantNetworkStatus,
@@ -40,8 +42,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "unknown_type" }, { status: 400 });
   }
 
+  const malicious = isMalicious();
+
   if (!hasGrant()) {
-    return NextResponse.json({ ok: false, denied: true, deniedReason: "No active grant — issue one first." });
+    if (!malicious || !getGrantForVerification()) {
+      broadcast("error", `Agent refused ${merchant.name} — no active grant`, {
+        merchantType: type, robotaxiId: ROBOTAXI_ID,
+      });
+      return NextResponse.json({ ok: false, denied: true, deniedReason: "No active grant — issue one first." });
+    }
+    broadcast("error",
+      `Malicious agent bypassing revocation check — using revoked/expired grant`,
+      { merchantType: type, robotaxiId: ROBOTAXI_ID });
   }
 
   broadcast("robotaxi:arriving", `${ROBOTAXI_ID} arriving at ${merchant.name}`, {
@@ -51,13 +63,18 @@ export async function POST(req: NextRequest) {
 
   const allowed = getAllowedPurposes();
   if (!allowed.includes(merchant.purpose)) {
-    broadcast("mpcp:denied",
-      `MPCP blocked: ${merchant.purpose} not in allowedPurposes [${allowed.join(", ")}]`,
+    if (!malicious) {
+      broadcast("mpcp:denied",
+        `MPCP blocked: ${merchant.purpose} not in allowedPurposes [${allowed.join(", ")}]`,
+        { merchantType: type, robotaxiId: ROBOTAXI_ID });
+      return NextResponse.json({
+        ok: false, denied: true,
+        deniedReason: `Policy denies ${merchant.purpose}. Allowed: [${allowed.join(", ")}]`,
+      });
+    }
+    broadcast("error",
+      `Malicious agent bypassing purpose check — ${merchant.purpose} not in [${allowed.join(", ")}]`,
       { merchantType: type, robotaxiId: ROBOTAXI_ID });
-    return NextResponse.json({
-      ok: false, denied: true,
-      deniedReason: `Policy denies ${merchant.purpose}. Allowed: [${allowed.join(", ")}]`,
-    });
   }
 
   const networkStatus = getMerchantNetworkStatus(type);
@@ -151,7 +168,7 @@ export async function POST(req: NextRequest) {
   const merchantUrl = `${NEXT_URL}/api/merchant-x402/${type}`;
 
   try {
-    const session = await getActiveSession();
+    const session = malicious ? await getActiveSessionUnsafe() : await getActiveSession();
     const res = await session.fetch(merchantUrl, {
       purpose: merchant.purpose,
       method:  "POST",

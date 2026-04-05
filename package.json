@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "setup": "npx tsx scripts/setup.ts",
+    "demo": "bash scripts/start-demo.sh",
     "dev": "cd web && npm run dev",
     "web": "cd web && npm run dev"
   },

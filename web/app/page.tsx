@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { FleetPanel } from "@/components/FleetPanel";
 import { MerchantTerminal } from "@/components/MerchantTerminal";
 import { RobotaxiPanel } from "@/components/RobotaxiPanel";
+import { ScenarioPanel } from "@/components/ScenarioPanel";
 import { EventFeed } from "@/components/EventFeed";
 import { sessionApi, type SessionState } from "@/lib/api";
 
@@ -63,6 +64,9 @@ export default function Home() {
             ))}
           </div>
         </div>
+
+        {/* Scenario controls */}
+        <ScenarioPanel />
 
         {/* Robotaxi action bar */}
         <RobotaxiPanel session={session ?? null} onAction={refetchSession} />

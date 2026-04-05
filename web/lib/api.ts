@@ -92,5 +92,24 @@ export const merchantControlsApi = {
     }),
 };
 
+// ── Demo scenario controls ───────────────────────────────────────────────────
+
+export const demoApi = {
+  getPaStatus: () => call<{ running: boolean }>("/api/demo/pa-control"),
+  setPa: (action: "start" | "stop") =>
+    call<{ ok: boolean; running: boolean; message?: string }>("/api/demo/pa-control", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    }),
+  getAgentMode: () => call<{ mode: "honest" | "malicious" }>("/api/demo/agent-mode"),
+  setAgentMode: (mode: "honest" | "malicious") =>
+    call<{ mode: string }>("/api/demo/agent-mode", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode }),
+    }),
+};
+
 // Re-export types used by components
 export type { DemoEvent, SessionState, GrantPreset };

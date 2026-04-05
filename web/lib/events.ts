@@ -18,6 +18,9 @@ export type EventType =
   | "merchant:access_denied"
   | "grant:issued"
   | "grant:revoked"
+  | "infra:pa_stopped"
+  | "infra:pa_started"
+  | "agent:override"
   | "error";
 
 export interface DemoEvent {

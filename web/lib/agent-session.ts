@@ -107,6 +107,27 @@ export function getGrantForVerification(): unknown {
   return state._grant;
 }
 
+/**
+ * Force-create a session even if the grant is locally marked as revoked.
+ * Used by the "malicious agent" demo scenario to show gateway-side enforcement.
+ */
+export async function getActiveSessionUnsafe(): Promise<GatewaySession> {
+  if (!state._grant) throw new Error("No grant loaded — issue a grant first");
+  state._session = null;
+  const grant = state._grant as Record<string, unknown>;
+  const expiresAt = state._expiresAt ?? new Date(Date.now() + 86_400_000).toISOString();
+  const purposes = state._allowedPurposes.length > 0
+    ? state._allowedPurposes
+    : ["transport:toll", "transport:charging", "transport:parking"];
+  state._session = await gatewayClient().createSession({
+    budget:   { amount: state._ceilingDrops, currency: "XRP" },
+    purposes,
+    expiresAt,
+    signedPolicyGrant: grant as Record<string, unknown>,
+  });
+  return state._session;
+}
+
 export async function getActiveSession(): Promise<GatewaySession> {
   if (state._revoked) throw new Error("Grant has been revoked");
   if (!state._grant) throw new Error("No grant loaded — issue a grant first");

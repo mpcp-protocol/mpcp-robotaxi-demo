@@ -17,6 +17,9 @@ const EVENT_COLORS: Record<string, string> = {
   "merchant:access_denied":  "text-danger",
   "grant:issued":            "text-green",
   "grant:revoked":           "text-warn",
+  "infra:pa_stopped":        "text-warn",
+  "infra:pa_started":        "text-green",
+  "agent:override":          "text-warn",
   "error":                   "text-danger",
 };
 
