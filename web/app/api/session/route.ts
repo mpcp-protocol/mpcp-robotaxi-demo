@@ -8,19 +8,21 @@ export async function GET() {
   try {
     const state = await getSessionState();
 
-    // Augment with on-chain spend audit when a grant is active and gateway is configured.
     if (state.active && state.grantId && GATEWAY_ADDRESS) {
       try {
-        const onChainSpentDrops = await queryOnChainSpend(GATEWAY_ADDRESS, state.grantId);
+        const onChainSpentDrops = await Promise.race([
+          queryOnChainSpend(GATEWAY_ADDRESS, state.grantId),
+          new Promise<null>((r) => setTimeout(() => r(null), 2_000)),
+        ]);
         return NextResponse.json({ ...state, onChainSpentDrops });
       } catch {
-        // XRPL unavailable — return null gracefully, do not block UI
         return NextResponse.json({ ...state, onChainSpentDrops: null });
       }
     }
 
     return NextResponse.json(state);
   } catch {
-    return NextResponse.json({ active: false, error: "session_error" }, { status: 500 });
+    // Never return 500 — the FleetPanel relies on 200 to preserve grant state.
+    return NextResponse.json({ active: false, remainingDrops: null });
   }
 }
