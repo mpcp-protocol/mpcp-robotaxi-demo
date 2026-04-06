@@ -152,51 +152,32 @@ export async function getActiveSession(): Promise<GatewaySession> {
 export async function getSessionState(): Promise<SessionState> {
   const gatewayAddress = process.env.XRPL_GATEWAY_ADDRESS ?? "—";
 
-  if (!state._grant) {
-    return {
-      active:          false,
-      revoked:         false,
-      grantId:         null,
-      allowedPurposes: [],
-      ceilingDrops:    "0",
-      remainingDrops:  null,
-      expiresAt:       null,
-      grantSetAt:      null,
-      gatewayAddress,
-      onChainSpentDrops: null,
-    };
-  }
-
-  if (!state._session) {
-    try {
-      await getActiveSession();
-    } catch {
-      return {
-        active:          true,
-        revoked:         state._revoked,
-        grantId:         state._grantId,
-        allowedPurposes: state._allowedPurposes,
-        ceilingDrops:    state._ceilingDrops,
-        remainingDrops:  null,
-        expiresAt:       state._expiresAt,
-        grantSetAt:      state._grantSetAt?.toISOString() ?? null,
-        gatewayAddress,
-        onChainSpentDrops: null,
-      };
-    }
-  }
-
-  const budget = await state._session!.remaining();
-  return {
-    active:          true,
+  const base: SessionState = {
+    active:          !!state._grant,
     revoked:         state._revoked,
     grantId:         state._grantId,
     allowedPurposes: state._allowedPurposes,
     ceilingDrops:    state._ceilingDrops,
-    remainingDrops:  budget.remainingMinor.toString(),
+    remainingDrops:  null,
     expiresAt:       state._expiresAt,
     grantSetAt:      state._grantSetAt?.toISOString() ?? null,
     gatewayAddress,
     onChainSpentDrops: null,
   };
+
+  if (!state._grant) return base;
+
+  // Only query the gateway for remaining budget if we already have a session.
+  // Never create a session here — that happens on actual payment actions.
+  if (state._session) {
+    try {
+      const budget = await Promise.race([
+        state._session.remaining(),
+        new Promise<null>((r) => setTimeout(() => r(null), 2_000)),
+      ]);
+      if (budget) base.remainingDrops = budget.remainingMinor.toString();
+    } catch { /* gateway unreachable — return null remaining */ }
+  }
+
+  return base;
 }

@@ -207,19 +207,26 @@ export async function verifySbaOffline(
     }
   }
 
-  // ── XLS-70 on-chain credential liveness check ────────────────────────────
+  // ── XLS-70 on-chain credential liveness check (best-effort) ──────────────
+  // In offline mode the merchant may not have XRPL connectivity either, so
+  // treat any network/timeout error as "unable to check" and fall through.
   const credIssuer = innerGrant.activeGrantCredentialIssuer as string | undefined;
   const credSubject = innerGrant.authorizedGateway as string | undefined;
   const credGrantId = innerGrant.grantId as string | undefined;
 
   if (credIssuer && credSubject && credGrantId) {
     try {
-      const live = await checkGrantCredentialLiveness(credIssuer, credSubject, credGrantId);
-      if (!live) {
+      const live = await Promise.race([
+        checkGrantCredentialLiveness(credIssuer, credSubject, credGrantId),
+        new Promise<null>((r) => setTimeout(() => r(null), 4_000)),
+      ]);
+      if (live === false) {
         return { ok: false, reason: "Grant credential not found on XRPL — grant revoked or expired" };
       }
+      // live === true  → credential exists, continue
+      // live === null   → timeout, treat as best-effort pass
     } catch {
-      // XRPL connectivity issue — fall through (best-effort)
+      // XRPL unreachable — fall through; trust bundle verification already passed
     }
   }
 

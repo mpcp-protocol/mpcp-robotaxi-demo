@@ -33,11 +33,24 @@ export function ScenarioPanel() {
     setPaLoading(true);
     try {
       const action = paRunning ? "stop" : "start";
-      const { running } = await demoApi.setPa(action);
-      setPaRunning(running);
+      await demoApi.setPa(action);
+      if (action === "stop") {
+        setPaRunning(false);
+        setPaLoading(false);
+      } else {
+        // Poll quickly until PA is up (client-side, doesn't block server)
+        let found = false;
+        for (let i = 0; i < 30; i++) {
+          await new Promise((r) => setTimeout(r, 700));
+          try {
+            const { running } = await demoApi.getPaStatus();
+            if (running) { setPaRunning(true); found = true; break; }
+          } catch { /* keep polling */ }
+        }
+        if (!found) setPaRunning(false);
+        setPaLoading(false);
+      }
     } catch {
-      // health poll will catch up
-    } finally {
       setPaLoading(false);
     }
   }

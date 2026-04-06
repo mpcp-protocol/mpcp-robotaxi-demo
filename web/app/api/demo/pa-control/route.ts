@@ -1,19 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
-import { execSync, spawn } from "node:child_process";
+import { exec, spawn } from "node:child_process";
 import { resolve } from "node:path";
-import { checkPaHealth, invalidatePaCache } from "@/lib/demo-controls";
+import { checkPaHealth, invalidatePaCache, setBroadcastFn } from "@/lib/demo-controls";
 import { broadcast } from "@/lib/events";
+
+setBroadcastFn(broadcast as (type: string, msg: string) => void);
 
 const PA_DIR = resolve(process.cwd(), "../../mpcp-policy-authority");
 
-function findPaPid(): number | null {
-  try {
-    const out = execSync("lsof -ti :3000 2>/dev/null", { encoding: "utf-8" }).trim();
-    const pids = out.split("\n").map(Number).filter(Boolean);
-    return pids[0] ?? null;
-  } catch {
-    return null;
+function run(cmd: string): Promise<string> {
+  return new Promise((resolve) => {
+    const child = exec(cmd, { timeout: 2_000 }, (err, stdout) => {
+      resolve(err ? "" : stdout.trim());
+    });
+    child.unref();
+  });
+}
+
+async function killListenersOnPort(port: number): Promise<boolean> {
+  // -sTCP:LISTEN ensures we only kill the SERVER on this port,
+  // not other processes (like ourselves) that have client connections to it.
+  const out = await run(`lsof -ti :${port} -sTCP:LISTEN 2>/dev/null`);
+  if (!out) return false;
+  const pids = out.split("\n").map(Number).filter(Boolean);
+  for (const pid of pids) {
+    try { process.kill(pid, "SIGKILL"); } catch { /* already dead */ }
   }
+  return pids.length > 0;
+}
+
+async function isPortFree(port: number): Promise<boolean> {
+  const out = await run(`lsof -ti :${port} -sTCP:LISTEN 2>/dev/null`);
+  return !out;
 }
 
 export async function GET() {
@@ -25,45 +43,31 @@ export async function POST(req: NextRequest) {
   const { action }: { action: "start" | "stop" } = await req.json();
 
   if (action === "stop") {
-    const pid = findPaPid();
-    if (!pid) {
-      return NextResponse.json({ ok: true, running: false, message: "PA was not running" });
-    }
-    try {
-      process.kill(pid, "SIGTERM");
-    } catch {
-      try { process.kill(pid, "SIGKILL"); } catch { /* already dead */ }
-    }
+    await killListenersOnPort(3000);
     invalidatePaCache();
-    broadcast("infra:pa_stopped", "Policy Authority stopped (process killed)");
+    broadcast("infra:pa_stopped", "Policy Authority stopped");
     return NextResponse.json({ ok: true, running: false });
   }
 
   if (action === "start") {
-    const existing = findPaPid();
-    if (existing) {
+    if (!(await isPortFree(3000))) {
       return NextResponse.json({ ok: true, running: true, message: "PA already running" });
     }
 
-    const child = spawn("npm", ["run", "dev"], {
+    spawn("npm", ["run", "dev"], {
       cwd: PA_DIR,
       stdio: "ignore",
       detached: true,
-      env: { ...process.env, FORCE_COLOR: "0" },
-    });
-    child.unref();
+      env: {
+        PATH: process.env.PATH,
+        HOME: process.env.HOME,
+        NODE_ENV: "development",
+        FORCE_COLOR: "0",
+      },
+    }).unref();
 
-    // Poll until healthy (up to 15s)
-    for (let i = 0; i < 30; i++) {
-      await new Promise((r) => setTimeout(r, 500));
-      invalidatePaCache();
-      if (await checkPaHealth()) {
-        broadcast("infra:pa_started", "Policy Authority started and healthy");
-        return NextResponse.json({ ok: true, running: true });
-      }
-    }
-
-    return NextResponse.json({ ok: false, running: false, message: "PA started but health check timed out" });
+    invalidatePaCache();
+    return NextResponse.json({ ok: true, running: false, message: "PA starting…" });
   }
 
   return NextResponse.json({ error: "unknown action" }, { status: 400 });

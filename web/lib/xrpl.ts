@@ -179,7 +179,8 @@ export async function queryOnChainSpend(
 
 /**
  * Check if an XLS-70 grant credential exists on-ledger (liveness proof).
- * Returns true if the credential object is found, false if not (revoked/expired).
+ * Returns true if found, false if definitively not found (revoked/expired).
+ * Throws on connectivity or unexpected errors so callers can fall through.
  */
 export async function checkGrantCredentialLiveness(
   issuer: string,
@@ -195,8 +196,12 @@ export async function checkGrantCredentialLiveness(
       ledger_index: "validated",
     } as any);
     return true;
-  } catch {
-    return false;
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("entryNotFound") || msg.includes("objectNotFound")) {
+      return false;
+    }
+    throw err;
   }
 }
 

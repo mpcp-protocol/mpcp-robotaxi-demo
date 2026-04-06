@@ -37,9 +37,9 @@ fi
 
 # ── Kill stale processes on our ports ─────────────────────────────────────────
 for port in 3000 3997 3001; do
-  pid=$(lsof -ti :"$port" 2>/dev/null || true)
+  pid=$(lsof -ti :"$port" -sTCP:LISTEN 2>/dev/null || true)
   if [ -n "$pid" ]; then
-    echo -e "${CYAN}Killing stale process on port $port (pid $pid)${NC}"
+    echo -e "${CYAN}Killing stale listener on port $port (pid $pid)${NC}"
     kill -9 $pid 2>/dev/null || true
     sleep 0.3
   fi
@@ -61,7 +61,7 @@ PA_PID=$!
 
 # ── 2. Trust Gateway (port 3997) ─────────────────────────────────────────────
 echo -e "${GREEN}▸ Trust Gateway${NC}     → http://localhost:3997"
-(cd "$GW_DIR" && XRPL_GATEWAY_SEED="$XRPL_SEED" npm run dev) &
+(cd "$GW_DIR" && XRPL_GATEWAY_SEED="$XRPL_SEED" MPCP_PA_URL="http://localhost:3000" npm run dev) &
 GW_PID=$!
 
 # ── 3. Robotaxi Web App (port 3001) ─────────────────────────────────────────

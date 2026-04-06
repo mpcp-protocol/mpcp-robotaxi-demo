@@ -217,8 +217,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, denied: true, deniedReason: err.message });
     }
     if (err instanceof GatewayGrantRevokedError) {
-      broadcast("mpcp:denied", "Grant revoked or expired", {
+      const detail = malicious
+        ? "Trust Gateway rejected revoked grant — malicious agent caught by infrastructure"
+        : "Grant revoked or expired";
+      broadcast("mpcp:denied", detail, {
         merchantType: type, robotaxiId: ROBOTAXI_ID,
+        dev: { maliciousAgent: malicious, enforcement: "gateway" },
       });
       return NextResponse.json({ ok: false, denied: true, deniedReason: err.message });
     }
